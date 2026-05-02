@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ration Shop System - Pro</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; }
+        .container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 900px; margin: auto; text-align: center; }
+        h2 { color: #2c3e50; margin-bottom: 20px; }
+        h3 { border-bottom: 2px solid #6a992e; display: inline-block; padding-bottom: 5px; color: #34495e; margin-top: 0; }
+        h4 { margin-top: 15px; margin-bottom: 5px; color: #555; }
+        
+        .tabs { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; }
+        .tab { padding: 10px 20px; cursor: pointer; font-weight: bold; color: #7f8c8d; border-radius: 5px; transition: 0.3s; }
+        .tab.active { background-color: #6a992e; color: white; }
+        
+        .form-group { margin-bottom: 15px; text-align: left; position: relative; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        input, select { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; }
+        
+        .toggle-password { position: absolute; right: 10px; top: 38px; cursor: pointer; color: #7f8c8d; }
+        
+        button { background-color: #6a992e; color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; margin-top: 10px; }
+        button:hover { background-color: #567d25; }
+        
+        .dashboard-section { display: none; margin-top: 20px; text-align: left; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; }
+        table, th, td { border: 1px solid #eee; padding: 12px; text-align: left; }
+        th { background-color: #f8f9fa; color: #333; }
+        
+        .logout-btn { background-color: #e74c3c; margin-top: 20px; }
+        .logout-btn:hover { background-color: #c0392b; }
+        .hidden { display: none; }
+        .card { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #6a992e; }
+        .sub-card { background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #eee; }
+        .loader { color: #6a992e; font-size: 14px; display: none; }
+        
+        .shop-item { background: #fff; padding: 15px; border: 1px solid #eee; margin-bottom: 10px; border-radius: 8px; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .shop-item strong { color: #2c3e50; font-size: 1.1em; }
+        
+        .stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 15px; }
+        .stock-box { background: white; border: 1px solid #eee; padding: 10px; border-radius: 5px; text-align: center; }
+        .stock-box input { padding: 8px; font-size: 14px; text-align: center; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; border: 1px solid #eee; }
+        .stat-card p { font-size: 24px; font-weight: bold; margin: 10px 0 0; color: #2c3e50; }
+        
+        #liveClock { position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 8px 15px; border-radius: 20px; font-size: 14px; z-index: 1000; }
+        .stock-info { font-size: 13px; color: #e67e22; margin-top: 5px; display: block; font-weight: bold; line-height: 1.4; }
+        .profile-container { background: #eaf2e3; padding: 15px; border-radius: 8px; margin-top: 15px; text-align: left; border: 1px solid #6a992e; }
+        
+        .view-btn { background-color: #3498db; width: auto; padding: 5px 10px; font-size: 12px; margin-right: 5px; }
+        .delete-btn { background-color: #e74c3c; width: auto; padding: 5px 10px; font-size: 12px; }
+        .back-btn { background-color: #7f8c8d; width: auto; margin-top: 10px; }
+
+        .sales-info-box { background: #fffbe6; padding: 10px; border: 1px solid #ffe58f; border-radius: 6px; margin-bottom: 15px; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; border-bottom: 1px dotted #ccc; padding: 5px 0; }
+    </style>
+</head>
+<body onload="startClock()">
+
+<div id="liveClock"></div>
+
+<div class="container">
+    <h2>🌾 RATION E-SHOP PRO</h2>
+    
+    <div id="tabContainer" class="tabs">
+        <div id="tab-admin" class="tab active" onclick="switchTab('admin')">Admin</div>
+        <div id="tab-employee" class="tab" onclick="switchTab('employee')">Employee</div>
+        <div id="tab-customer" class="tab" onclick="switchTab('customer')">Customer</div>
+    </div>
+
+    <div id="authFormSection">
+        <h3 id="formTitle">Admin Login</h3>
+        <div class="form-group">
+            <label id="loginIdLabel">Login ID / Email</label>
+            <input type="text" id="email" placeholder="Enter ID" required>
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="password" placeholder="Enter Password" required>
+            <span class="toggle-password" onclick="togglePassword('password')">👁️</span>
+        </div>
+        
+        <div id="empNameField" class="form-group hidden">
+            <label>Employee Name</label>
+            <input type="text" id="employeeName" placeholder="Enter Your Name">
+        </div>
+        
+        <button onclick="login()">LOGIN</button>
+        <p id="regLink" class="hidden" style="margin-top:15px;">New Customer? <a href="#" onclick="showRegisterForm()">Register here</a></p>
+    </div>
+
+    <div id="registerForm" class="hidden">
+        <h3>Customer Registration</h3>
+        <div class="form-group"><input type="email" id="regEmail" placeholder="Email" required></div>
+        <div class="form-group"><input type="text" id="regName" placeholder="Full Name" required></div>
+        <div class="form-group"><input type="text" id="regCardNo" placeholder="Ration Card Number" required></div>
+        <div class="form-group">
+            <input type="number" id="regPincode" placeholder="Pincode" oninput="fetchPostOffice(this.value, 'reg')">
+            <span id="regLoader" class="loader">Fetching...</span>
+        </div>
+        <div class="form-group"><input type="text" id="regVillage" placeholder="Village / Area" readonly style="background-color: #eee;"></div>
+        <div class="form-group"><input type="text" id="regDistrict" placeholder="District" readonly style="background-color: #eee;"></div>
+        
+        <div class="form-group"><input type="password" id="regPassword" placeholder="Password (min 6 chars)" required></div>
+        <button onclick="registerCustomer()">CREATE ACCOUNT</button>
+        <p><a href="#" onclick="showLoginForm()">Back to Login</a></p>
+    </div>
+
+    <div id="adminDashboard" class="dashboard-section">
+        <h3>Admin Control Panel</h3>
+        <div class="stats-grid"><div class="stat-card"><h4>Low Stock Shops</h4><p id="lowStockCount" style="color:#e74c3c;">0</p></div></div>
+        <button onclick="showCustomerList()">👥 View Registered Customers</button>
+        <button onclick="showBookingList()">📅 View Slot Bookings</button>
+        <div class="card">
+            <h4>➕ Add New Ration Shop</h4>
+            <div class="sub-card">
+                <input type="text" id="shopName" placeholder="Shop Name" style="margin-bottom:10px;"><br>
+                <input type="text" id="shopId" placeholder="Shop ID" style="margin-bottom:10px;"><br>
+                <input type="text" id="shopAddress" placeholder="Address (Door No, Street)" style="margin-bottom:10px;"><br>
+                <input type="number" id="shopPincode" placeholder="Pincode" oninput="fetchPostOffice(this.value, 'shop')" style="margin-bottom:10px;"><br>
+                <span id="shopLoader" class="loader">Fetching...</span>
+                <input type="text" id="villageName" placeholder="Village Name" readonly style="margin-bottom:10px; background-color: #eee;"><br>
+                <input type="text" id="shopDistrict" placeholder="District" readonly style="margin-bottom:10px; background-color: #eee;"><br>
+                <input type="password" id="shopPass" placeholder="Shop Password" style="margin-bottom:10px;"><br>
+                <button onclick="addRationShop()">Add Shop</button>
+            </div>
+        </div>
+        <h4>All Shop List</h4>
+        <div id="adminStockContainer">Loading...</div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+    
+    <div id="adminViewShopSection" class="dashboard-section">
+        <h3>Shop Details</h3>
+        <button class="back-btn" onclick="hideAdminShopView()">Back to Admin Panel</button>
+        <div id="detailedShopContent">Loading...</div>
+    </div>
+
+    <div id="customerListPage" class="dashboard-section">
+        <h3>Registered Customers</h3>
+        <button onclick="hideCustomerList()">Back to Dashboard</button>
+        <table id="allCustomerTable"><thead><tr><th>Name</th><th>Email</th><th>Card No</th><th>Area</th></tr></thead><tbody></tbody></table>
+    </div>
+    
+    <div id="bookingListPage" class="dashboard-section">
+        <h3>Customer Slot Bookings</h3>
+        <button onclick="hideBookingList()">Back to Dashboard</button>
+        <table id="allBookingTable"><thead><tr><th>Customer</th><th>Card No</th><th>Date</th><th>Slot</th><th>Token</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div id="employeeDashboard" class="dashboard-section">
+        <h3>Staff Workstation</h3>
+        <div class="card">
+            <p><strong>Shop:</strong> <span id="empShopNameDisplay"></span> (<span id="empShopIdDisplay"></span>)</p>
+            <p><strong>Location:</strong> <span id="empShopLocationDisplay"></span></p>
+            <p><strong>Employee:</strong> <span id="activeEmpName"></span></p>
+            <button onclick="toggleStockForm()">📦 Update Stock</button>
+            <button onclick="toggleSalesForm()">📝 Daily Sales</button>
+            <button onclick="loadBookedCustomers()">📅 View Today's Bookings</button>
+            
+            <div id="stockForm" class="hidden">
+                <h4>Upload Product Stocks</h4>
+                <div class="stock-grid" id="stockInputs"></div>
+                <button onclick="updateStock()">Save Stock</button>
+            </div>
+            
+            <div id="salesForm" class="hidden">
+                <h4>Daily Sales Entry</h4>
+                <input type="text" id="saleToken" placeholder="Enter Token Number" style="margin-bottom:10px;" oninput="fetchTokenDetails(this.value)">
+                
+                <div id="tokenDetailsDisplay" class="sales-info-box hidden">
+                    <p><strong>Customer:</strong> <span id="salesCustName"></span></p>
+                    <p><strong>Card No:</strong> <span id="salesCardNo"></span></p>
+                </div>
+
+                <div class="form-group">
+                    <label>Select Product</label>
+                    <select id="salesProductSelect" onchange="addProductToCart(this.value)">
+                        <option value="">-- Choose Product --</option>
+                    </select>
+                </div>
+
+                <div id="salesCart" class="card">
+                    <h5>Items in Bill</h5>
+                    <div id="cartItemsList"></div>
+                </div>
+
+                <button onclick="submitDailySales()">Submit & Update Stock</button>
+            </div>
+            
+            <div id="bookedCustomersList" class="hidden">
+                <h4>Today's Bookings</h4>
+                <table id="bookedCustomersTable"><thead><tr><th>Token</th><th>Customer Name</th><th>Card No</th><th>Time</th><th>Action</th></tr></thead><tbody></tbody></table>
+            </div>
+        </div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div id="customerDashboard" class="dashboard-section">
+        <h3>Customer Zone</h3>
+        <button onclick="toggleProfile()" style="background-color: #3498db;">👤 View Profile</button>
+        <div id="profileDetails" class="profile-container hidden">
+            <p><strong>Name:</strong> <span id="pName"></span></p>
+            <p><strong>Card No:</strong> <span id="pCardNo"></span></p>
+            <p><strong>Area:</strong> <span id="pArea"></span></p>
+        </div>
+        
+        <div class="card">
+            <h4>📅 Book Your Slot</h4>
+            <div class="form-group">
+                <input type="number" id="bookingPincode" placeholder="Enter Pincode" oninput="loadShopsForBooking(this.value)" style="margin-bottom:10px;">
+                <select id="bookingShopSelect" style="margin-bottom:10px;" onchange="showShopStock(this.value)"><option value="">Enter Pincode First</option></select>
+                <span id="stockStatus" class="stock-info"></span>
+            </div>
+            <div class="form-group"><label>Select Date</label><select id="bookingDate" style="margin-bottom:10px;"></select></div>
+            <div class="form-group"><label>Select Hour Slot</label>
+                <select id="bookingSlot" style="margin-bottom:10px;">
+                    <option value="09:00">9 AM - 10 AM</option>
+                    <option value="10:00">10 AM - 11 AM</option>
+                    <option value="11:00">11 AM - 12 PM</option>
+                    <option value="14:00">2 PM - 3 PM</option>
+                    <option value="15:00">3 PM - 4 PM</option>
+                    <option value="16:00">4 PM - 5 PM</option>
+                </select>
+            </div>
+            <button onclick="bookSlot()">Confirm Booking</button>
+        </div>
+        <h4>My Booking</h4>
+        <div id="myBookingsList"></div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<script>
+    // --- FIREBASE CONFIGURATION ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyAKpDpNKjIcV6hVlJT9-MAiNRfTHUEwbec",
+        authDomain: "ration-shop123.firebaseapp.com",
+        projectId: "ration-shop123",
+        storageBucket: "ration-shop123.firebasestorage.app",
+        messagingSenderId: "419274971032",
+        appId: "1:419274971032:web:b0bb2656a4c48682c4bded"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const holidays = ["2026-03-05", "2026-03-10", "2026-03-15", "2026-08-15"];
+    const productList = ["rice", "sugar", "oil", "wheat", "dal", "salt", "soap", "kerosene", "maida", "rava"];
+    let selectedRole = 'admin';
+    let currentShopData = null;
+    let currentUserProfile = null;
+    let salesCart = {};
+
+    const stockInputs = document.getElementById('stockInputs');
+    const salesProductSelect = document.getElementById('salesProductSelect');
+
+    productList.forEach(p => {
+        stockInputs.innerHTML += `<div class="stock-box"><label>${p.toUpperCase()}</label><input type="number" id="s_${p}" value="0"></div>`;
+        salesProductSelect.innerHTML += `<option value="${p}">${p.toUpperCase()}</option>`;
+    });
+
+    function startClock() {
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('liveClock').innerText = now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+    }
+
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(() => {
+        auth.onAuthStateChanged((user) => {
+            if (user) verifyAndRedirect(user);
+        });
+    });
+
+    function togglePassword(inputId) {
+        const passInput = document.getElementById(inputId);
+        passInput.type = passInput.type === 'password' ? 'text' : 'password';
+    }
+
+    function switchTab(role) {
+        selectedRole = role;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(`tab-${role}`).classList.add('active');
+        document.getElementById('formTitle').innerText = role.charAt(0).toUpperCase() + role.slice(1) + " Login";
+        document.getElementById('regLink').style.display = role === 'customer' ? 'block' : 'none';
+        document.getElementById('empNameField').style.display = role === 'employee' ? 'block' : 'none';
+        
+        const loginIdLabel = document.getElementById('loginIdLabel');
+        if(role === 'customer') loginIdLabel.innerText = "Ration Card Number / Email";
+        else if(role === 'employee') loginIdLabel.innerText = "Shop ID";
+        else loginIdLabel.innerText = "Admin Email";
+    }
+
+    function showRegisterForm() {
+        document.getElementById('authFormSection').classList.add('hidden');
+        document.getElementById('tabContainer').classList.add('hidden');
+        document.getElementById('registerForm').classList.remove('hidden');
+    }
+
+    function showLoginForm() {
+        document.getElementById('authFormSection').classList.remove('hidden');
+        document.getElementById('tabContainer').classList.remove('hidden');
+        document.getElementById('registerForm').classList.add('hidden');
+        document.querySelectorAll('.dashboard-section').forEach(d => d.style.display = 'none');
+    }
+
+    function login() {
+        const emailOrId = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const empName = document.getElementById('employeeName').value;
+
+        if(!emailOrId || !password) return alert("Fill all fields");
+
+        if (selectedRole === 'admin') {
+            auth.signInWithEmailAndPassword(emailOrId, password).then(() => alert("Login Successful!")).catch((error) => alert(error.message));
+        } else if (selectedRole === 'employee') {
+            if(!empName) return alert("Enter employee name");
+            db.collection("shops").where("shopId", "==", emailOrId).where("password", "==", password).get()
+                .then((querySnapshot) => {
+                    if (!querySnapshot.empty) {
+                        const shopDoc = querySnapshot.docs[0];
+                        currentShopData = { id: shopDoc.id, ...shopDoc.data() };
+                        document.getElementById('authFormSection').classList.add('hidden');
+                        document.getElementById('tabContainer').classList.add('hidden');
+                        document.getElementById('employeeDashboard').style.display = 'block';
+                        document.getElementById('empShopIdDisplay').innerText = currentShopData.shopId;
+                        document.getElementById('empShopNameDisplay').innerText = currentShopData.shopName;
+                        document.getElementById('empShopLocationDisplay').innerText = `${currentShopData.address}, ${currentShopData.village}, ${currentShopData.district} - ${currentShopData.pincode}`;
+                        document.getElementById('activeEmpName').innerText = empName;
+                        loadCurrentStock();
+                    } else alert("Invalid Shop ID or Password");
+                });
+        } else {
+            db.collection("users").where("cardNo", "==", emailOrId).get()
+                .then((querySnapshot) => {
+                    if (!querySnapshot.empty) {
+                        const userDoc = querySnapshot.docs[0];
+                        const userData = userDoc.data();
+                        if(userData.password === password) {
+                             auth.signInWithEmailAndPassword(userData.email, userData.password).then(() => {
+                                redirectToDashboard(userData, userDoc.id);
+                             });
+                        }
+                        else alert("Invalid Card Number or Password");
+                    } else alert("User not found");
+                });
+        }
+    }
+
+    async function verifyAndRedirect(user) {
+        try {
+            let doc = await db.collection("users").doc(user.uid).get();
+            if (!doc.exists) {
+                const userSnapshot = await db.collection("users").where("email", "==", user.email).get();
+                if(!userSnapshot.empty) doc = userSnapshot.docs[0];
+                else return;
+            }
+            redirectToDashboard(doc.data(), doc.id);
+        } catch (e) { console.error(e); }
+    }
+
+    function redirectToDashboard(userData, userId) {
+        currentUserProfile = userData;
+        currentUserProfile.uid = userId;
+        document.getElementById('authFormSection').classList.add('hidden');
+        document.getElementById('tabContainer').classList.add('hidden');
+        if (userData.role === 'admin') {
+            document.getElementById('adminDashboard').style.display = 'block';
+            loadAdminStocks();
+            loadStockStatusDashboard();
+        } else if (userData.role === 'customer') {
+            document.getElementById('customerDashboard').style.display = 'block';
+            populateDateDropdown();
+            loadMyBookings();
+        }
+    }
+
+    async function fetchPostOffice(pincode, type) {
+        if (pincode.length !== 6) return;
+        const loader = document.getElementById(type === 'reg' ? 'regLoader' : 'shopLoader');
+        const villageInput = document.getElementById(type === 'reg' ? 'regVillage' : 'villageName');
+        const districtInput = document.getElementById(type === 'reg' ? 'regDistrict' : 'shopDistrict');
+        loader.style.display = 'inline';
+        try {
+            const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+            const data = await response.json();
+            if (data[0].Status === "Success") {
+                const po = data[0].PostOffice[0];
+                villageInput.value = po.Name;
+                districtInput.value = po.District;
+            } else alert("Invalid Pincode");
+        } catch (error) { console.error(error); } finally { loader.style.display = 'none'; }
+    }
+
+    async function loadShopsForBooking(pincode) {
+        const shopSelect = document.getElementById('bookingShopSelect');
+        if (pincode.length !== 6) { shopSelect.innerHTML = '<option value="">Enter Valid Pincode</option>'; return; }
+        const querySnapshot = await db.collection("shops").where("pincode", "==", pincode).get();
+        shopSelect.innerHTML = "<option value=''>Select Shop</option>";
+        if (!querySnapshot.empty) {
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                shopSelect.innerHTML += `<option value="${doc.id}">${data.shopName} - ${data.address}, ${data.village}</option>`;
+            });
+        }
+    }
+
+    function showShopStock(shopId) {
+        if(!shopId) return;
+        db.collection("shops").doc(shopId).get().then(doc => {
+            const data = doc.data();
+            const items = Object.entries(data.stock).map(([name, qty]) => `${name.charAt(0).toUpperCase() + name.slice(1)}: ${qty}`);
+            document.getElementById('stockStatus').innerText = "Stock: " + items.join(", ");
+        });
+    }
+
+    function populateDateDropdown() {
+        const dateSelect = document.getElementById('bookingDate');
+        dateSelect.innerHTML = "";
+        let daysAdded = 0;
+        let currentDate = new Date();
+        while (daysAdded < 3) {
+            let dateStr = currentDate.toISOString().slice(0, 10);
+            let dayOfWeek = currentDate.getDay();
+            if (dayOfWeek !== 0 && !holidays.includes(dateStr)) {
+                dateSelect.innerHTML += `<option value="${dateStr}">${dateStr}</option>`;
+                daysAdded++;
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+    }
+
+    function registerCustomer() {
+        const email = document.getElementById('regEmail').value;
+        const name = document.getElementById('regName').value;
+        const cardNo = document.getElementById('regCardNo').value;
+        const password = document.getElementById('regPassword').value;
+        const pincode = document.getElementById('regPincode').value;
+        const village = document.getElementById('regVillage').value;
+        const district = document.getElementById('regDistrict').value;
+        if(!email || !cardNo || !password || !pincode) return alert("Fill all fields");
+        auth.createUserWithEmailAndPassword(email, password)
+            .then((userCredential) => {
+                return db.collection("users").doc(userCredential.user.uid).set({
+                    email, name, role: "customer", cardNo, password, pincode, village, district, createdAt: new Date()
+                });
+            })
+            .then(() => { alert("Registered Successfully!"); showLoginForm(); })
+            .catch((error) => alert(error.message));
+    }
+
+    function toggleProfile() {
+        const p = document.getElementById('profileDetails');
+        p.classList.toggle('hidden');
+        if(!p.classList.contains('hidden') && currentUserProfile) {
+            document.getElementById('pName').innerText = currentUserProfile.name;
+            document.getElementById('pCardNo').innerText = currentUserProfile.cardNo;
+            document.getElementById('pArea').innerText = currentUserProfile.village + ", " + currentUserProfile.district;
+        }
+    }
+
+    function toggleStockForm() { document.getElementById('stockForm').classList.toggle('hidden'); }
+    function toggleSalesForm() { document.getElementById('salesForm').classList.toggle('hidden'); }
+
+    // --- EMPLOYEE SALES FUNCTIONS ---
+
+    async function fetchTokenDetails(token) {
+        const display = document.getElementById('tokenDetailsDisplay');
+        if(token.length < 5) {
+            display.classList.add('hidden');
+            return;
+        }
+        const snapshot = await db.collection("bookings").where("shopId", "==", currentShopData.id).where("token", "==", token).get();
+        if(!snapshot.empty) {
+            const data = snapshot.docs[0].data();
+            display.classList.remove('hidden');
+            document.getElementById('salesCustName').innerText = data.userName;
+            document.getElementById('salesCardNo').innerText = data.cardNo;
+        } else {
+            display.classList.add('hidden');
+        }
+    }
+
+    function addProductToCart(prod) {
+        if(!prod) return;
+        if(salesCart[prod]) return alert("Product already in bill");
+        salesCart[prod] = 1;
+        renderCart();
+    }
+
+    function updateCartQty(prod, qty) {
+        salesCart[prod] = parseInt(qty) || 1;
+    }
+
+    function removeFromCart(prod) {
+        delete salesCart[prod];
+        renderCart();
+    }
+
+    function renderCart() {
+        const list = document.getElementById('cartItemsList');
+        list.innerHTML = "";
+        for (let prod in salesCart) {
+            list.innerHTML += `
+                <div class="cart-item">
+                    <span>${prod.toUpperCase()}</span>
+                    <input type="number" value="${salesCart[prod]}" style="width: 60px; padding: 5px;" oninput="updateCartQty('${prod}', this.value)">
+                    <button class="delete-btn" onclick="removeFromCart('${prod}')">❌</button>
+                </div>
+            `;
+        }
+    }
+
+    async function submitDailySales() {
+        const token = document.getElementById('saleToken').value;
+        if(!token || Object.keys(salesCart).length === 0) return alert("Enter Token and select items");
+
+        // 1. Save Sales Record
+        await db.collection("sales").add({
+            shopId: currentShopData.id, 
+            token, 
+            items: salesCart, 
+            date: new Date().toISOString().slice(0, 10), 
+            timestamp: new Date()
+        });
+
+        // 2. Update Shop Stock
+        const shopRef = db.collection("shops").doc(currentShopData.id);
+        const shopDoc = await shopRef.get();
+        let currentStock = shopDoc.data().stock;
+
+        for(let prod in salesCart) {
+            if(currentStock[prod] !== undefined) {
+                currentStock[prod] -= salesCart[prod];
+            }
+        }
+
+        await shopRef.update({ stock: currentStock });
+
+        alert("Sale Complete & Stock Updated!");
+        salesCart = {};
+        renderCart();
+        document.getElementById('saleToken').value = "";
+        document.getElementById('tokenDetailsDisplay').classList.add('hidden');
+        toggleSalesForm();
+        loadCurrentStock();
+    }
+
+    // --- OTHER EXISTING FUNCTIONS ---
+
+    function updateStock() {
+        if(!currentShopData) return;
+        let newStock = {};
+        productList.forEach(p => newStock[p] = parseInt(document.getElementById(`s_${p}`).value) || 0);
+        db.collection("shops").doc(currentShopData.id).update({ stock: newStock })
+            .then(() => { alert("Stock Updated Successfully!"); checkLowStock(currentShopData.id, newStock); toggleStockForm(); });
+    }
+
+    function loadCurrentStock() {
+        db.collection("shops").doc(currentShopData.id).get().then(doc => {
+            const stock = doc.data().stock;
+            if(stock) productList.forEach(p => document.getElementById(`s_${p}`).value = stock[p] || 0);
+        });
+    }
+
+    async function bookSlot() {
+        if (!auth.currentUser) return alert("Login verification in progress...");
+        const user = auth.currentUser;
+        const shopId = document.getElementById('bookingShopSelect').value;
+        const date = document.getElementById('bookingDate').value;
+        const hour = document.getElementById('bookingSlot').value;
+        if(!shopId || !date || !hour) return alert("Select shop, date, and hour");
+        const bookingsRef = db.collection("bookings");
+        const existingBooking = await bookingsRef.where("userId", "==", user.uid).where("status", "==", "pending").get();
+        if(!existingBooking.empty) return alert("You already have an active booking.");
+        const snapshot = await bookingsRef.where("shopId", "==", shopId).where("date", "==", date).where("hour", "==", hour).get();
+        if (snapshot.size >= 12) return alert("Slot full!");
+        const intervalCount = snapshot.size; 
+        const [h, m] = hour.split(':');
+        const minutes = intervalCount * 5;
+        const finalTime = `${h}:${String(minutes).padStart(2, '0')}`;
+        bookingsRef.add({
+            userId: user.uid, userName: currentUserProfile.name, cardNo: currentUserProfile.cardNo,
+            shopId, date, hour, time: finalTime, token: "TN" + Math.floor(1000 + Math.random() * 9000), status: "pending", timestamp: new Date()
+        }).then(() => { 
+            alert(`Booked! Time: ${finalTime}`); 
+            loadMyBookings(); 
+        });
+    }
+
+    function loadMyBookings() {
+        if(!auth.currentUser) return;
+        const listDiv = document.getElementById('myBookingsList');
+        db.collection("bookings").where("userId", "==", auth.currentUser.uid).where("status", "==", "pending").get()
+            .then(snapshot => {
+                listDiv.innerHTML = "";
+                if(snapshot.empty) { 
+                    listDiv.innerHTML = "<p>No active bookings.</p>"; 
+                    return; 
+                }
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    listDiv.innerHTML += `
+                        <div class="sub-card">
+                            <strong>Date:</strong> ${data.date} | <strong>Time:</strong> ${data.time} | <strong>Token:</strong> ${data.token}
+                            <br><button class="delete-btn" style="width:auto; padding:5px; margin-top:5px;" onclick="deleteMyBooking('${doc.id}')">Cancel Booking</button>
+                        </div>`;
+                });
+            }).catch(err => console.error("Error loading bookings:", err));
+    }
+    
+    function deleteMyBooking(bookingId) {
+        if(!confirm("Are you sure?")) return;
+        db.collection("bookings").doc(bookingId).delete().then(() => {
+            alert("Cancelled!");
+            loadMyBookings();
+        });
+    }
+
+    function addRationShop() {
+        const name = document.getElementById('shopName').value;
+        const shopId = document.getElementById('shopId').value;
+        const address = document.getElementById('shopAddress').value;
+        const pincode = document.getElementById('shopPincode').value;
+        if(!name || !shopId || !pincode || !address) return alert("Fill required fields");
+        let initialStock = {}; productList.forEach(p => initialStock[p] = 0);
+        db.collection("shops").add({
+            shopName: name, shopId, address: address, pincode,
+            village: document.getElementById('villageName').value, district: document.getElementById('shopDistrict').value,
+            password: document.getElementById('shopPass').value, stock: initialStock, createdAt: new Date()
+        }).then(() => { alert("Shop Added!"); loadAdminStocks(); });
+    }
+
+    function loadAdminStocks() {
+        const container = document.getElementById('adminStockContainer');
+        db.collection("shops").get().then((querySnapshot) => {
+            container.innerHTML = "";
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                container.innerHTML += `
+                    <div class="shop-item">
+                        <strong>${data.shopName}</strong> 
+                        <span style="float:right; font-size:12px; color: #7f8c8d;">ID: ${data.shopId}</span>
+                        <br>
+                        <span style="font-size:14px;">📍 ${data.address}, ${data.village}</span>
+                        <br>
+                        <button class="view-btn" onclick="viewShopDetails('${doc.id}')">View Shop</button>
+                        <button class="delete-btn" onclick="deleteShop('${doc.id}')">Delete</button>
+                    </div>`;
+            });
+        });
+    }
+    
+    function viewShopDetails(shopId) {
+        document.getElementById('adminDashboard').style.display = 'none';
+        document.getElementById('adminViewShopSection').style.display = 'block';
+        const content = document.getElementById('detailedShopContent');
+        content.innerHTML = "Loading Details...";
+        db.collection("shops").doc(shopId).get().then(shopDoc => {
+            const data = shopDoc.data();
+            let stockHtml = "<h4>📦 Current Stock</h4><div class='sub-card'>";
+            for (let item in data.stock) { stockHtml += `<strong>${item.toUpperCase()}:</strong> ${data.stock[item]} | `; }
+            stockHtml += "</div>";
+            content.innerHTML = `
+                <div class="card">
+                    <h4>${data.shopName} (${data.shopId})</h4>
+                    <p>Address: ${data.address}, ${data.village}, ${data.district} - ${data.pincode}</p>
+                    ${stockHtml}
+                </div>
+                <div class="card">
+                    <h4>📅 Today's Bookings</h4>
+                    <table id="adminViewBookingTable"><thead><tr><th>Customer</th><th>Card No</th><th>Time</th><th>Token</th></tr></thead><tbody></tbody></table>
+                </div>
+            `;
+            loadDetailedBookings(shopId);
+        });
+    }
+    
+    function hideAdminShopView() {
+        document.getElementById('adminViewShopSection').style.display = 'none';
+        document.getElementById('adminDashboard').style.display = 'block';
+    }
+    
+    function loadDetailedBookings(shopId) {
+        const date = new Date().toISOString().slice(0, 10);
+        const tableBody = document.querySelector("#adminViewBookingTable tbody");
+        db.collection("bookings").where("shopId", "==", shopId).where("date", "==", date).get()
+            .then(snapshot => {
+                tableBody.innerHTML = "";
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    tableBody.innerHTML += `<tr><td>${data.userName}</td><td>${data.cardNo}</td><td>${data.time}</td><td>${data.token}</td></tr>`;
+                });
+            });
+    }
+    
+    function deleteShop(shopId) {
+        if(!confirm("Are you sure?")) return;
+        db.collection("shops").doc(shopId).delete().then(() => {
+            alert("Deleted!");
+            loadAdminStocks();
+        });
+    }
+
+    function loadStockStatusDashboard() {
+        db.collection("shops").get().then((snapshot) => {
+            let lowStockCount = 0;
+            snapshot.forEach((doc) => {
+                let stock = doc.data().stock;
+                if(stock) { for (let item in stock) { if (stock[item] < 10) { lowStockCount++; break; } } }
+            });
+            document.getElementById('lowStockCount').innerText = lowStockCount;
+        });
+    }
+
+    function checkLowStock(shopId, stock) {
+        let lowItems = [];
+        for (let item in stock) { if (stock[item] < 10) lowItems.push(item); }
+        if (lowItems.length > 0) {
+            db.collection("notifications").add({
+                shopId, message: `Low Stock: ${lowItems.join(", ")}`, timestamp: new Date(), read: false
+            });
+        }
+    }
+    
+    function showCustomerList() {
+        document.getElementById('adminDashboard').style.display = 'none';
+        document.getElementById('customerListPage').style.display = 'block';
+        loadAllCustomers();
+    }
+    function hideCustomerList() {
+        document.getElementById('customerListPage').style.display = 'none';
+        document.getElementById('adminDashboard').style.display = 'block';
+    }
+    function loadAllCustomers() {
+        const tableBody = document.querySelector("#allCustomerTable tbody");
+        db.collection("users").where("role", "==", "customer").get().then((querySnapshot) => {
+            tableBody.innerHTML = "";
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                tableBody.innerHTML += `<tr><td>${data.name}</td><td>${data.email}</td><td>${data.cardNo}</td><td>${data.district}</td></tr>`;
+            });
+        });
+    }
+    function showBookingList() {
+        document.getElementById('adminDashboard').style.display = 'none';
+        document.getElementById('bookingListPage').style.display = 'block';
+        loadAllBookings();
+    }
+    function hideBookingList() {
+        document.getElementById('bookingListPage').style.display = 'none';
+        document.getElementById('adminDashboard').style.display = 'block';
+    }
+    function loadAllBookings() {
+        const tableBody = document.querySelector("#allBookingTable tbody");
+        db.collection("bookings").get().then((snapshot) => {
+            tableBody.innerHTML = "";
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                tableBody.innerHTML += `<tr><td>${data.userName}</td><td>${data.cardNo}</td><td>${data.date}</td><td>${data.time}</td><td>${data.token}</td></tr>`;
+            });
+        });
+    }
+    
+    function loadBookedCustomers() {
+        const listDiv = document.getElementById('bookedCustomersList');
+        const tableBody = document.querySelector("#bookedCustomersTable tbody");
+        const date = new Date().toISOString().slice(0, 10);
+        listDiv.classList.remove('hidden');
+        db.collection("bookings").where("shopId", "==", currentShopData.id).where("date", "==", date).get()
+            .then((snapshot) => {
+                tableBody.innerHTML = "";
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td>${data.token}</td>
+                            <td>${data.userName}</td>
+                            <td>${data.cardNo}</td>
+                            <td>${data.time}</td>
+                            <td>
+                                ${data.status === "pending" ? 
+                                `<button class="confirm-btn" style="background-color: #6a992e; width:auto; padding:5px; font-size:12px;" onclick="confirmDelivery('${doc.id}', '${data.shopId}')">Mark Given</button>` 
+                                : 'Completed'}
+                            </td>
+                        </tr>
+                    `;
+                });
+            });
+    }
+
+    async function confirmDelivery(bookingId, shopId) {
+        if(!confirm("Confirm product delivery?")) return;
+        await db.collection("bookings").doc(bookingId).update({ status: "completed" });
+        alert("Completed!");
+        loadBookedCustomers();
+    }
+
+    function logout() { auth.signOut().then(() => location.reload()); }
+</script>
+
+</body>
+</html>
